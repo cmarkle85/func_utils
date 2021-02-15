@@ -2,15 +2,9 @@
   Helper functions used across scripts.
 """
 
-import inspect
-import json
+import os, sys, inspect, pickle, shutil, traceback
 import multiprocessing as mp
-import os
-import pickle
-import shutil
-import sys
-import traceback
-from functools import wraps, reduce, update_wrapper
+from functools import wraps, reduce
 from timeit import default_timer
 
 _this_dir, _this_file = os.path.split(os.path.abspath(__file__))
@@ -33,7 +27,7 @@ class PipelineIO(object):
 def build_pipe(fs, decorators=None):
     """
       builds and returns a data pipeline from a list of functions (fs)
-      only supports functions with single positional arguements
+      only supports functions with single positional arguments
     """
     if decorators:
         fs = reduce(lambda a, dec: map(dec, a), decorators, fs)
@@ -98,7 +92,7 @@ def escape(f):
 def args_type_checking(f):
     """
       typechecking decorator, requires decorated function to leverage type hints from typing module
-      ONLY works with positional arguements
+      ONLY works with positional arguments
     """
     signature = inspect.signature(f)
 
