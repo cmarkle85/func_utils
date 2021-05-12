@@ -2,9 +2,9 @@
   Helper functions used across scripts.
 """
 
-import os, sys, inspect, pickle, shutil, traceback
+import os, sys, inspect, pickle, shelve, shutil, traceback
 import multiprocessing as mp
-from functools import wraps, reduce
+from functools import wraps, reduce, partial
 from timeit import default_timer
 
 _this_dir, _this_file = os.path.split(os.path.abspath(__file__))
@@ -24,6 +24,23 @@ class PipelineIO(object):
             pickle.dump(self.a, f)
 
 
+def IO(loc, writeback=True):
+    """
+      Decorator that forces data to be passed between pipeline stages using IO rather than in memory.
+    """
+
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            with shelve.open(loc, writeback=writeback) as a:
+                f(a)
+            return None
+
+        return wrapper
+
+    return decorator
+
+
 def build_pipe(fs, decorators=None):
     """
       builds and returns a data pipeline from a list of functions (fs)
@@ -34,7 +51,7 @@ def build_pipe(fs, decorators=None):
     return lambda x: reduce(lambda a, f: f(a), fs, x)
 
 
-def build_branches(fs):
+def build_branches(fs, log_func=print):
     """
         Executes all functions against the same input and merges results.
         All results must be dicts and no two branches can update the same key.
@@ -52,7 +69,7 @@ def build_branches(fs):
         return reduce(lambda a, d: a.update(d) or a, branch_results, {})
 
     def _execute_branches(x):
-        print(f"Executing {[f.__name__ for f in fs]} in parallel...")
+        log_func(f"Executing {[f.__name__ for f in fs]} in parallel...")
         procs = [mp.Process(target=queue_results, args=(q, f, x)) for f in fs]
         for p in procs: p.start()
         for p in procs: p.join()
@@ -101,33 +118,35 @@ def args_type_checking(f):
         for arg, param in zip(locals()['args'], signature.parameters.values()):
             if param.annotation != inspect.Parameter.empty:
                 if type(param.annotation) == list:
-                    assert type(
-                            arg) in param.annotation, f"Argument {param.name, type(arg)} does not have the expected type: {param.annotation}"
+                    condition = type(arg) in param.annotation
                 else:
-                    assert type(
-                            arg) == param.annotation, f"Argument {param.name, type(arg)} does not have the expected type: {param.annotation}"
+                    condition = type(arg) == param.annotation
+                assert condition, f"Argument {param.name, type(arg)} does not have the expected type: {param.annotation}"
         return f(*args, **kwargs)
 
     return wrapper
 
 
-def timing(f):
+def timing(f=None, *, log_func=print):
     """
       Timing decorator
+      log_func is an optional argument specifying how the timing_statement should be recorded
     """
+    if f is None:
+        return partial(timing, log_func=log_func)
 
     @wraps(f)
     def wrapper(*args, **kwargs):
         ts = default_timer()
         result = f(*args, **kwargs)
         t = default_timer() - ts
-        print(f'Function "{f.__name__}" Elapsed Time: {t}')
+        log_func(f'Function "{f.__name__}" Elapsed Time: {t}')
         return result
 
     return wrapper
 
 
-def time_step(step_max):
+def time_step(step_max, log_func=print):
     """
       Timing decorator for each step in a training procedure
     """
@@ -139,7 +158,7 @@ def time_step(step_max):
             ts = default_timer()
             result = f(*args, **kwargs)
             t = default_timer() - ts
-            print(f'{result}, Step Time: {t}, Time Remaining: {t * (step_max - wrapper.calls)}')
+            log_func(f'{result}, Step Time: {t}, Time Remaining: {t * (step_max - wrapper.calls)}')
             return result
 
         wrapper.calls = 0
@@ -149,7 +168,7 @@ def time_step(step_max):
     return decorator
 
 
-def workdir(d):
+def workdir(d, log_func=print):
     """
         Decorator for changing the working directory and path temporarily
     """
@@ -160,8 +179,8 @@ def workdir(d):
             entry_workdir = sys.path[0]
             os.chdir(d)
             sys.path[0] = d
-            print(f"cwd: {os.getcwd()}")
-            print(f"sys.path: {sys.path}")
+            log_func(f"cwd: {os.getcwd()}")
+            log_func(f"sys.path: {sys.path}")
             result = f(*args, **kwargs)
             os.chdir(entry_workdir)
             sys.path[0] = entry_workdir
