@@ -47,7 +47,7 @@ def build_pipe(fs, decorators=None):
       only supports functions with single positional arguments
     """
     if decorators:
-        fs = reduce(lambda a, dec: map(dec, a), decorators, fs)
+        fs = list(reduce(lambda a, dec: map(dec, a), decorators, fs))
     return lambda x: reduce(lambda a, f: f(a), fs, x)
 
 
