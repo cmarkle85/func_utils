@@ -137,6 +137,7 @@ def timing(f=None, *, log_func=print):
 
     @wraps(f)
     def wrapper(*args, **kwargs):
+        log_func(f'Starting {f__name__} ...')
         ts = default_timer()
         result = f(*args, **kwargs)
         t = default_timer() - ts
