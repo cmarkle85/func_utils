@@ -137,7 +137,7 @@ def timing(f=None, *, log_func=print):
 
     @wraps(f)
     def wrapper(*args, **kwargs):
-        log_func(f'Starting {f__name__} ...')
+        log_func(f'Starting {f.__name__} ...')
         ts = default_timer()
         result = f(*args, **kwargs)
         t = default_timer() - ts
@@ -218,3 +218,13 @@ def download_binary_file(remote_loc, destination_loc):
     with requests.get(remote_loc, stream=True) as r:
         with open(destination_loc, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
+
+# def get_class(name):
+#     import sys, inspect
+#     clsmembers = inspect.getmembers(
+#         sys.modules[file],
+#         lambda member: inspect.isclass(member) and (member.__module__ == file)
+#     )
+#     clsmembers = [(n,v) for n,v in clsmembers if n == name]
+#     assert len(clsmembers) == 1
+#     return clsmembers[0][1]
